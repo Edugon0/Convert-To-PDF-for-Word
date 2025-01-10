@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de PDF para Word</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .title {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 2px dashed #4CAF50;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            background-color: #f0f9f0;
+            border-color: #45a049;
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        #convertBtn {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        #convertBtn:hover {
+            background-color: #45a049;
+        }
+
+        #convertBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #fileInfo {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .error { color: #d32f2f; background-color: #ffebee; }
+        .success { color: #388e3c; background-color: #e8f5e9; }
+        .loading { color: #1976d2; background-color: #e3f2fd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Conversor de PDF para Word</h1>
+        
+        <div class="upload-area" id="dropZone">
+            <div class="upload-icon">📄</div>
+            <p>Arraste seu arquivo PDF aqui ou clique para selecionar</p>
+            <p style="font-size: 12px; color: #666;">Tamanho máximo: 10MB</p>
+            <input type="file" id="fileInput" style="display: none" accept=".pdf">
+        </div>
+
+        <div id="fileInfo"></div>
+        <button id="convertBtn" disabled>Converter para Word</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const convertBtn = document.getElementById('convertBtn');
+        const status = document.getElementById('status');
+        let currentFile = null;
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                
+                // Verificar se é um PDF
+                if (file.type !== 'application/pdf') {
+                    status.textContent = 'Por favor, selecione um arquivo PDF.';
+                    status.className = 'error';
+                    return;
+                }
+
+                // Verificar tamanho do arquivo
+                if (file.size > 10 * 1024 * 1024) {
+                    status.textContent = 'O arquivo deve ter menos de 10MB.';
+                    status.className = 'error';
+                    return;
+                }
+
+                currentFile = file;
+                fileInfo.textContent = `Arquivo selecionado: ${file.name}`;
+                convertBtn.disabled = false;
+                status.textContent = '';
+            }
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            if (!currentFile) return;
+
+            const formData = new FormData();
+            formData.append('file', currentFile);
+
+            status.textContent = 'Convertendo...';
+            status.className = 'loading';
+            convertBtn.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:3000/convert', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro na conversão');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentFile.name.replace('.pdf', '.docx');
+                a.click();
+                window.URL.revokeObjectURL(url);
+
+                status.textContent = 'Arquivo convertido com sucesso!';
+                status.className = 'success';
+            } catch (error) {
+                status.textContent = 'Erro ao converter arquivo: ' + error.message;
+                status.className = 'error';
+            } finally {
+                convertBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
